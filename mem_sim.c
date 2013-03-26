@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "util.h"
+#include <ctype.h>
 
 int main(int argc, char *argv[]) {
 
@@ -21,19 +23,20 @@ int main(int argc, char *argv[]) {
        exit(1);
    }
 
-   int cadres, cycle;
+   int cadres, cycle, i;
    char *endPtr;
    FILE *fichier;
    struct ref_processus proc;  
    struct memoire_physique * mem;
    cadres = strtol(argv[1], &endPtr, 10);
-   if(cadres <= 0 || endPtr != NULL) {
+   printf("cadres = %d\n", cadres);
+   if(cadres <= 0 || isspace(*endPtr)) {
        fprintf(stderr, "Erreur: nombre de cadres invalide.\n");
        exit(1);
    }
 
    cycle = strtol(argv[2], &endPtr, 10);
-   if(cycle <= 0 || endPtr != NULL) {
+   if(cycle <= 0 || isspace(*endPtr)) {
        fprintf(stderr, "Erreur: nombre de cycle invalide.\n");
        exit(1);
    }
@@ -41,19 +44,25 @@ int main(int argc, char *argv[]) {
     
    //Maintenant on essaie d'ouvrir le fichier
 
-   fichier = fopen(argv[3]);
+   fichier = fopen(argv[3], "r");
    if(fichier == NULL) {
-       fprintf("Erreur lors de l'ouverture du fichier.\n");
+       fprintf(stderr, "Erreur lors de l'ouverture du fichier.\n");
        exit(1);
    }
+   fclose(fichier);
 
    //Maintenant on est prêt à tester le fichier
-    proc = lireFichier(fichier);
-
-    fclose(fichier);
+    proc = lireFichier(argv[3]);
 
     
-    mem = algo_horloge(&proc, cadres);
+    //verif de proc
+    printf("proc =\n");
+    for(i = 0; i < proc.nbre_ref; ++i) {
+        printf("%d ", proc.references[i]);
+    }
+    printf("\n");
+
+    mem = algo_optimal(&proc, cadres);
 
     print_memoire_physique(*mem);
 
