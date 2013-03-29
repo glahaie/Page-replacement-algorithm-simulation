@@ -37,7 +37,10 @@ struct ref_processus lireFichier(const char * fichier){
 		struct ref_processus ref_proc;
 		ref_proc.references = p;
 		ref_proc.nbre_ref = i;
+        fclose(in);
 		return ref_proc;
+ 
+        //Ajout pour le moment -- verif avec prof
 	}else{	
 		//printf("errno : %d\n", errno);
 		perror("probleme ouverture");
@@ -247,6 +250,138 @@ struct memoire_physique * algo_optimal(struct ref_processus* pages, int cadres) 
 
     return mem;
 }
+
+
+//Pour le moment j'utilise la division et l'addition pour mettre à jour
+//les R, toutefois, il faudrait changer pour des operations bits à bits
+//pour etre un peu plus efficace et etre plus proche de ce qui se passe
+//vraiment
+struct memoire_physique * algo_vieillissement(struct ref_processus* pages, int cadres, int cycle) 
+{
+
+    printf("appel de algo_vieillissement\n");
+    assert(cadres > 0 && "Valeur de cadres invalide");
+
+    //Set up de la structure, devrait en faire une fonction
+    struct memoire_physique* mem = (struct memoire_physique*)malloc(sizeof(struct memoire_physique));
+    if(!mem)
+        printf("Probleme malloc mem\n");
+        //
+    mem->algo = VIEILLISSEMENT;
+    printf("mem->algo = %d\n", mem->algo);
+
+    mem->nbre_cadres = cadres;
+    mem->nbre_defauts_pages = 0;
+    mem->cadres = (struct cadre*)malloc(cadres*sizeof(struct cadre));
+    if(!mem->cadres)
+        //Erreur de malloc
+        printf("Probleme malloc cadres\n");
+
+    //Besoin aussi d'une structure pour 
+
+    int courant = 0, max_proche = -1, pos, j, k, temp, trouve;
+    int i, l;
+    int retour;
+    int pos_cycle= 0;
+    unsigned char toto;
+
+    char *maj = (char*)malloc(cadres*sizeof(char));
+    if(!maj)
+        printf("probleme malloc maj.\n");
+    for(i = 0; i < cadres; ++i) {
+        maj[i] = 0;
+    }
+
+    //On initialise les cadres à -1, pour savoir s'ils sont vides ou non au
+    //début -- regarder si memset pourrait fonctionner
+    for(i = 0; i < cadres; ++i) {
+        mem->cadres[i].page = -1;
+        mem->cadres[i].R = 0;
+    }
+    courant = 0;
+    //Maintenant on traite
+    printf("debut boucle\n");
+    for(i = 0; i < pages->nbre_ref; ++i) {
+
+        //debut: on regarde si la page est dans un des cadres
+
+        if((retour = contient(mem, pages->references[i])) >= 0) {
+            printf("Page deja en memoire, on met a jour son R.\n");
+            maj[retour] = 1;
+        }
+
+        //Maintenant ici on met à jour le cycle
+        ++pos_cycle;
+
+
+        //si on a defaut de page ou on a un clock tick, on met à jour
+        //les R
+        if(retour < 0 || pos_cycle >= cycle) {
+
+            //printf("clock tick ou defaut de page: met a jour les R\n");
+            for(j = 0; j < cadres; j++) {
+                toto = mem->cadres[j].R;
+                //printf("mem->cadres[j].R = %d, toto = %d\n", mem->cadres[j].R, toto);
+                toto = toto >> 1; //shift a droite
+                if(maj[j] != 0) {
+                  //  printf("maj[j] = %d\n", maj[j]);
+                    toto += 128; //0x10000000
+                }
+                mem->cadres[j].R = toto;
+                maj[j] = 0;
+            }
+            pos_cycle = 0;
+
+        }
+
+        //Maintenant, on regarde s'il y a defaut de page.
+        if(retour < 0) {
+            //Debut: on regarde si un cadre ne contient pas de pages
+            if (courant < cadres) {
+                    mem->cadres[courant].page = pages->references[i];
+                    mem->cadres[courant].R = 128;
+                    mem->nbre_defauts_pages++;
+                    courant++;
+            } else {
+
+                pos = 0;
+                max_proche = 256;  //Nom de var à changer
+                //Si on a pas de cadres libres, on choisit la victime
+                for(j = 0; j < cadres; j++) {
+                    toto = mem->cadres[j].R;
+     
+                    //On pourrait ici vérifier si c'est 0, car si c'est 0, pas
+                    //besoin de regarder plus loin
+                    if (toto < max_proche) {
+                        max_proche = toto;
+                        pos = j;
+                    }
+                }
+            
+                //Maintenant on remplace
+                mem->cadres[pos].page = pages->references[i];
+                mem->cadres[pos].R = 128;
+            }
+        }
+
+/*        printf("On affiche les R apres le defaut de page, s'il y en a un.\n");
+		    for (l = 0; l < mem->nbre_cadres ; l++){
+			    printf("%d[",mem->cadres[l].page);
+			    for(j=0,k=128; j<8; j++){ //128 : 10000000 en binaire
+				
+				    printf("%d", (mem->cadres[l].R & k) >> (7-j));//10000000
+				    k = k/2; 
+			    }
+			printf("] ");
+		}
+		printf("\n");
+*/
+    }
+    free(maj);
+    return mem;
+}
+
+
 
 
 

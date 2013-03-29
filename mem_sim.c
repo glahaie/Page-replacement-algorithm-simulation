@@ -62,10 +62,13 @@ int main(int argc, char *argv[]) {
     }
     printf("\n");
 
-    mem = algo_optimal(&proc, cadres);
+    mem = algo_vieillissement(&proc, cadres, cycle);
 
     print_memoire_physique(*mem);
 
+    free(mem->cadres);
+    free(mem);
+    free(proc.references);
     return 0;
 }
 
