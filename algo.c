@@ -12,32 +12,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#define MAX_R 256           //Valeur maximale de R + 1
+#define MAX_R 256           //Valeur maximale de R + 1 pour algo
+                            //vieillissement.
+#define R_1 1
+#define R_0 0
+#define R_10000000 128
 
 //contient: vérifie si la page est contenue dans un des cadres. Si elle est 
-//contenue, on retourne la position dans le tableau, sinon on retourne -1.
+//contenue, on retourne la position du cadre, sinon on retourne -1.
 int contient(struct memoire_physique*, int);
 
 //initiliaser_memoire: alloue de facon dynamique une struct memoire_physique
-//en ensuite initialise les valeurs dans cette structure.
+//en ensuite initialise les valeurs dans cette structure. Le tableau de
+//cadres est aussi alloué dynamiquement.
 struct memoire_physique* initialiser_memoire(int cadres, int algo);
 
-
 //trouver_proch_occ: trouve la prochaine occurence d'une page dans les
-//prochaines demandes. la valeur retournée représente la distance relative
+//prochaines demandes. La valeur retournée représente la distance relative
 //par rapport à la page traitée présentement. Si la page n'est plus demandée,
 //on retourne -1.
 int trouver_proch_occ(struct ref_processus*, int, int);
 
-
 //algo_horloge: simule le remplacement des pages selon l'algorithme de 
-//l'horloge.
+//l'horloge. Il y a deux niveaux de vérification effectuées lors d'un
+//défaut de page. Premièrement, on vérifie s'il reste un cadre vide.
+//Si tous les cadres sont occupés, on cherche alors le premier cadre
+//ayant une valeur de R = 0.J'utilise les valeurs entières de 0 et 1 pour
+//R. On pourrait changer les valeurs, mais ces valeurs fonctionnent
+//pour la fonction qui affiche le résultat.
 struct memoire_physique* algo_horloge(struct ref_processus *pages, int cadres) {
-
-    assert(cadres > 0 && "Valeur de cadres invalide");
 
     int courant = 0,        //position du prochain cadre vide, seulement pour
                             //les premiers cadres.
+        vide = 0,
         i,
         retour;             //position dans les cadres d'une page, si elle est
                             //présente
@@ -49,47 +56,46 @@ struct memoire_physique* algo_horloge(struct ref_processus *pages, int cadres) {
 
         //On vérifie si la page est déjà dans un cadre
         if((retour = contient(mem, pages->references[i])) >= 0 ) {
-            mem->cadres[retour].R = '1';
+            mem->cadres[retour].R = R_1;
         } else {
             //défaut de page
+            if(vide < mem->nbre_cadres) {
+                courant = vide++;
+            } else {
             
-            //On trouve la position de la victime. Soit un cadre vide, 
-            //soit le premier cadre ou R == '0'
-            while(mem->cadres[courant].page >= 0 && 
-                    mem->cadres[courant].R != '0') 
-            {
-                mem->cadres[courant].R = '0';
-                courant = (courant+1)%mem->nbre_cadres;
+                //On trouve la position de la victime. Soit un cadre vide, 
+                //soit le premier cadre ou R == R_0
+                while(mem->cadres[courant].R != R_0) {
+                    mem->cadres[courant].R = R_0;
+                    courant = (courant+1)%mem->nbre_cadres;
+                }
             }
-
             //Maintenant on a la position ou changer la valeur
             mem->nbre_defauts_pages++;
             mem->cadres[courant].page = pages->references[i];
-            mem->cadres[courant].R = '1';
+            mem->cadres[courant].R = R_1;
             courant = (courant +1)%mem->nbre_cadres;
         }
-
     }
-
     return mem;
 }
 
 //algo_optimal: simule le remplacement des pages selon l'algorithme optimal.
 //Pour ce faire, lors d'un remplacement de pages on regarde dans la suite
 //des pages demandées pour trouver le meilleur remplacement, celui qui, soit
-//ne revient, soit qui revient le plus tard possible.
+//ne revient, soit qui revient le plus tard possible. Je préfère chercher
+//le cadre optimal à changer lorsqu'il le faut plutôt que garder un tableau
+//pour chaque cadre.
 struct memoire_physique * algo_optimal(struct ref_processus* pages, int cadres) {
 
-    assert(cadres > 0 && "Valeur de cadres invalide");
     struct memoire_physique* mem = initialiser_memoire(cadres, OPTIMAL);
 
-    int courant = 0,            //indique la position du prochain cadre libre,
+    int vide = 0,               //indique la position du prochain cadre libre,
                                 //s'il y en a un
-        max_proche = -1,        //distance et position maximale de la prochaine
+        max_proche,             //distance et position maximale de la prochaine
         pos_max,                //demande de page
         prochOcc, i, j;
 
-    //Maintenant on traite
     for(i = 0; i < pages->nbre_ref; ++i) {
 
         //Debut: on regarde si la page n'est pas présente. Si elle est
@@ -99,9 +105,8 @@ struct memoire_physique * algo_optimal(struct ref_processus* pages, int cadres) 
             mem->nbre_defauts_pages++;
             
             //A-t-on un cadre libre?
-            if(courant < mem->nbre_cadres) {
-                mem->cadres[courant].page = pages->references[i];
-                courant++;
+            if(vide < mem->nbre_cadres) {
+                pos_max = vide++;
             } else {
                 //On trouve le remplacement optimal
 
@@ -119,10 +124,10 @@ struct memoire_physique * algo_optimal(struct ref_processus* pages, int cadres) 
                         pos_max = j;
                     }      
                 }
-
-                //On a maintenant l'endroit pour ecraser, on fait le changement
-                mem->cadres[pos_max].page = pages->references[i];
             }
+
+            //On a maintenant l'endroit pour ecraser, on fait le changement
+            mem->cadres[pos_max].page = pages->references[i];
         }
     } //fin for
 
@@ -130,23 +135,21 @@ struct memoire_physique * algo_optimal(struct ref_processus* pages, int cadres) 
 }
 
 
-//Pour le moment j'utilise la division et l'addition pour mettre à jour
-//les R, toutefois, il faudrait changer pour des operations bits à bits
-//pour etre un peu plus efficace et etre plus proche de ce qui se passe
-//vraiment
+//algo_vieillissement: Simule l'algorithme de remplacement de pages
+//vieillissement. La valeur de R ici est représentée par un octet, donc
+//un char. Toutefois, le char dans la structure est signée, donc j'utilise
+//une valeur temporaire afin de plus facilement mettre à jour les valeurs
+//de R lors d'un défaut de page ou alors à la fin d'un cycle.
 struct memoire_physique * algo_vieillissement(struct ref_processus* pages, 
         int cadres, int cycle) 
 {
-
-    assert(cadres > 0 && "Valeur de cadres invalide");
-
     struct memoire_physique* mem = initialiser_memoire(cadres, VIEILLISSEMENT);
 
-    int courant = 0,        //position du prochain cadre libre, s'il y en a un
+    int vide = 0,           //position du prochain cadre libre, s'il y en a un
         min,                //min: plus petite valeur de R
         pos,                //position de min
         i, j,
-        retour;             //
+        retour;             
     int pos_cycle= 0;
     unsigned char temp;     //permet de facilement mettre a jour la valeur
                             //de vieillissement d'un cadre
@@ -175,7 +178,7 @@ struct memoire_physique * algo_vieillissement(struct ref_processus* pages,
                 temp = mem->cadres[j].R;
                 temp = temp >> 1; //shift a droite d'une position
                 if(maj[j] != 0) {
-                    temp += 128; //0x10000000
+                    temp += R_10000000; //0x10000000
                 }
                 mem->cadres[j].R = temp;
                 maj[j] = 0;
@@ -187,10 +190,8 @@ struct memoire_physique * algo_vieillissement(struct ref_processus* pages,
         if(retour < 0) {
             //Debut: on regarde si un cadre ne contient pas de pages
             mem->nbre_defauts_pages++;
-            if (courant < cadres) {
-                    mem->cadres[courant].page = pages->references[i];
-                    mem->cadres[courant].R = 128;
-                    courant++;
+            if (vide < cadres) {
+                pos = vide++;
             } else {
                 min = MAX_R;  //Nom de var à changer
                 //Si on a pas de cadres libres, on choisit la victime
@@ -204,10 +205,10 @@ struct memoire_physique * algo_vieillissement(struct ref_processus* pages,
                             break;
                     }
                 }
-                //Maintenant on remplace
-                mem->cadres[pos].page = pages->references[i];
-                mem->cadres[pos].R = 0x80;
-            } //fin else
+            }
+            //Maintenant on remplace
+            mem->cadres[pos].page = pages->references[i];
+            mem->cadres[pos].R = R_10000000;
         } //fin if
     } //fin for exterieur
     free(maj);
@@ -227,6 +228,7 @@ int contient (struct memoire_physique * mem, int valeur) {
 
 struct memoire_physique* initialiser_memoire(int cadres, int algo) {
 
+    assert(cadres > 0 && "Valeur de cadres invalide");
     int i;
     struct memoire_physique* mem = 
         (struct memoire_physique*)malloc(sizeof(struct memoire_physique));

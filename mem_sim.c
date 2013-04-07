@@ -1,13 +1,30 @@
 /* mem_sim.c
  * Par Guillaume Lahaie
  * LAHG04077707
- * Dernière modification: 29 mars 2013
+ * Dernière modification: 7 avril 2013
  *
- * Déclaration de threads pour les fonctions de simulation de
- * remplacement de pages
+ * Ce programme simule différents algorithmes de remplacement de pages. Les
+ * trois algorithmes simulés sont l'algorithme de remplacement optimal, 
+ * l'algorithme de remplacement horloge et l'algorithme de remplacement de
+ * vieillissement. 
  *
- * Pour le moment, je teste 1 à 1 les fonctions, donc on n'a pas
- * encore d'utilisation de threads.
+ * Pour lancer le programme, il faut spécifier le nombre de cadres et
+ * le cycle pour l'algorithme de vieillissement. Il faut aussi fournir
+ * un nom de fichier qui contient l'appel des pages.
+ *
+ * usage: ./executable <cadres> <cycle> <nom_fichier>
+ *
+ * Pour la simulation des algorithmes, le programme crée trois threads qui
+ * lancent la simulation d'un algorithme chaque. Afin de traiter la fin de
+ * chaque thread dans l'ordre qu'ils se terminent, j'utilise la solution du
+ * proposé au lab 8. Toutefois, après certains tests avec valgrind, il semble
+ * que cela peut causer certaines difficultés. Valgrind dénote une fuite de 
+ * mémoire malgré qu'une vérification du code permet de voir que chaque
+ * allocation de mémoire dynamique est libérée avant la fin du programme.
+ *
+ * Un cadre vide est représenté par le nombre -1. Les valeurs de R pour 
+ * l'algorithme de l'horloge sont représentés par les entiers 0 et 1.
+ * 
  */
 
 #include <stdio.h>
@@ -30,7 +47,7 @@ typedef struct {
     int cycle;
     int algo;
     int i;
-} Arguments;  //vue qu'un seul arg  pour threads
+} Arguments;
 
 
 //appel_algo: fonction appelée lors de la creation du thread. Selon les
@@ -42,7 +59,7 @@ void* appel_algo(void *);
 int main(int argc, char *argv[]) {
 
    if(argc != 4) {
-       fprintf(stderr, "Utilisation: ./%s <nombres_de_cadres> <cycle> <fichier_sequence_referenrce\n", argv[0]);
+       fprintf(stderr, "Utilisation: %s <nombres_de_cadres> <cycle> <fichier_sequence_reference\n", argv[0]);
        exit(1);
    }
 
@@ -51,7 +68,7 @@ int main(int argc, char *argv[]) {
    Arguments arg[NB_THREADS];    //Arguments pour pthread_create. J'ai besoin d'un
                                  //tableau pour que les threads executent les 
                                  //algorithmes differents.
-   int cadres, cycle, i;
+   int cadres, cycle, i,j;
    char *endPtr;
    struct ref_processus proc;  
    struct memoire_physique * mem;
@@ -102,13 +119,6 @@ int main(int argc, char *argv[]) {
     //La seconde cause des problemes pour la verif avec valgrind, donc, je ne
     //l'utilise pas pour le moment.
 
-    for(i = 0; i < NB_THREADS; i++) {
-        if(pthread_join(tid[i], &retour[i])) {
-            fprintf(stderr, "Erreur sur join #%d\n", i);
-        }
-    }
-
-/*
     i = 0;
     j= 0;
     while(j < NB_THREADS) {
@@ -123,7 +133,7 @@ int main(int argc, char *argv[]) {
         }
         i = (i + 1)%NB_THREADS;
     }
-*/
+
 
     //Maintenant, on affiche les resultats
     for(i = 0; i < NB_THREADS; i++) {
@@ -134,7 +144,7 @@ int main(int argc, char *argv[]) {
     }
 
     free(proc.references);
-    return 0;
+    exit(0);
 }
 
 
