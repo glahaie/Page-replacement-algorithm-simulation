@@ -25,6 +25,18 @@
  * Un cadre vide est représenté par le nombre -1. Les valeurs de R pour 
  * l'algorithme de l'horloge sont représentés par les entiers 0 et 1.
  * 
+ * Le programme vérifie d'abord que les arguments fournies lors du
+ * lancement du programme sont valides. Il lit ensuite le fichier
+ * passé en argument et insère les données du fichier dans la
+ * struct ref processus. Les trois simulations sont ensuites
+ * appelées, chacun à partir d'un thread différent, et le programme
+ * attend ensuite la fin de l'éxécution des threads. Il affiche ensuite
+ * le résultat des différentes simulations.
+ *
+ * À noter, dans le fichier util.c fourni pour effectuer le TP, le
+ * fichier lu dans la fonction lireFichier n'est jamais fermé avec
+ * fclose avant la fin de la fonction, ce qui crée une fuite de mémoire.
+ * 
  */
 
 #include <stdio.h>
@@ -59,7 +71,8 @@ void* appel_algo(void *);
 int main(int argc, char *argv[]) {
 
    if(argc != 4) {
-       fprintf(stderr, "Utilisation: %s <nombres_de_cadres> <cycle> <fichier_sequence_reference\n", argv[0]);
+       fprintf(stderr, "Utilisation: %s <cadres> <cycle> \
+               <fichier_sequence_reference\n", argv[0]);
        exit(1);
    }
 
@@ -85,7 +98,7 @@ int main(int argc, char *argv[]) {
        exit(1);
    }
 
-   //Maintenant on est prêt à tester le fichier
+    //Lecture du fichier
     proc = lireFichier(argv[3]);
  
     //Creation des threads
@@ -114,11 +127,8 @@ int main(int argc, char *argv[]) {
 
     }
     
-    //Pour le moment j'ai les deux facons de faire les joins: premiere, naive,
-    //qui les fait dans l'ordre, la second le fait lorsqu'un thread a termine.
-    //La seconde cause des problemes pour la verif avec valgrind, donc, je ne
-    //l'utilise pas pour le moment.
-
+    
+    //On fait les joins lorsque les threads sont terminés.
     i = 0;
     j= 0;
     while(j < NB_THREADS) {
@@ -144,7 +154,7 @@ int main(int argc, char *argv[]) {
     }
 
     free(proc.references);
-    exit(0);
+    return 0;
 }
 
 

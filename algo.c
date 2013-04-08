@@ -210,6 +210,7 @@ struct memoire_physique * algo_vieillissement(struct ref_processus* pages,
             mem->cadres[pos].page = pages->references[i];
             mem->cadres[pos].R = R_10000000;
         } //fin if
+
     } //fin for exterieur
     free(maj);
     return mem;
